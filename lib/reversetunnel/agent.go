@@ -91,6 +91,8 @@ type AgentConfig struct {
 	// Server is a SSH server that can handle a connection (perform a handshake
 	// then process). Only set with the agent is running within a node.
 	Server ServerHandler
+	// ReverseTunnelServer holds all reverse tunnel connections.
+	ReverseTunnelServer Server
 }
 
 // CheckAndSetDefaults checks parameters and sets default values
@@ -426,16 +428,24 @@ func (a *Agent) processRequests(conn *ssh.Client) error {
 				a.Warningf("Failed to accept request: %v.", err)
 				continue
 			}
+
+			localClusterName, err := a.Client.GetLocalClusterName()
+			if err != nil {
+				a.Warnf("Failed to accept request: %v.\n", err)
+				continue
+			}
 			go proxyTransport(&transportParams{
-				log:          a.Entry,
-				closeContext: a.ctx,
-				authClient:   a.Client,
-				kubeDialAddr: a.KubeDialAddr,
-				channel:      ch,
-				requestCh:    req,
-				sconn:        conn.Conn,
-				server:       a.Server,
-				component:    teleport.ComponentReverseTunnelAgent,
+				log:                 a.Entry,
+				closeContext:        a.ctx,
+				authClient:          a.Client,
+				kubeDialAddr:        a.KubeDialAddr,
+				channel:             ch,
+				requestCh:           req,
+				sconn:               conn.Conn,
+				server:              a.Server,
+				component:           teleport.ComponentReverseTunnelAgent,
+				reverseTunnelServer: a.ReverseTunnelServer,
+				localClusterName:    localClusterName,
 			})
 		// new discovery request
 		case nch := <-newDiscoveryC:
